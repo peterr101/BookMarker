@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title>BookMarker</title>
+    <link rel="stylesheet"
+    href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+    <style>
+    body, .jumbotron {padding: 30px;}
+    body {
+      background-image: url('img/leaves.jpg');
+      background-size: cover;
+    }
+
+    .content {
+      /* using this one content class for both floater and bookmarks */
+      font-size: 19px;
+      line-height: 1.5;
+      max-width: 500px;
+      margin: 0 auto;
+      position: relative;
+      border-radius: 5px;
+    }
+
+    .floater {
+      background: #F5F5DC;
+      transition: 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.4) all;
+      margin-bottom: 35px;
+      margin-top: 200px;
+      z-index: 11;
+      /* z-index is above overlay */
+    }
+
+    .floater input[type=text]{
+      padding: 50px 30px;
+      border: none;
+      box-shadow: none;
+      font-size: 20px;
+      transition: 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.4) all;
+    }
+
+    .floater-bottom {
+      padding: 6px 10px 8px;
+      text-align: right;
+      border-top: 1px solid #DDD;
+    }
+
+    .floater-bottom button {
+      padding: 4px 8px;
+      font-size: 11px;
+    }
+
+
+
+    /* below we will style the overlay for when you click in on the floater */
+    .overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      background: rgba(0, 0, 0, 0.80);
+      width: 100%;
+      height: 100%;
+      opacity: 0;
+
+      /* when we begin opacity is zero */
+      transition: 0.4s ease;
+      /* when we have a transform from below we need transitions */
+      z-index: 10;
+      pointer-events: none;
+      /* now overlay doesn't handle any click events when its opacity is zero
+      and we can access the bookmarks
+      that are below it (i.e. have a lower z-index) */
+
+
+
+    }
+
+    /* now we will add directly to the body class */
+    /* this says if the body class has class show-floater do something to the floater, overlay, etc. */
+    body.show-floater .floater {
+      transform: scale(1.2);
+    }
+
+    body.show-floater .floater input[type=text] {
+      padding: 50px 20px;
+      font-size: 18px;
+    }
+
+    body.show-floater .overlay {
+      opacity: 1;
+      pointer-events: all;
+      /* when overlay is dark we want now to be able to click it away */
+    }
+/* ===========BookMarks================== */
+.bookmarks-list {
+  position: relative;
+  z-index: 9;
+  /* z-index here is lower that z-index for overlay*/
+}
+.bookmark {
+  display: flex;
+  background: #FFF;
+  position: relative;
+  color: #999;
+  padding: 20px;
+  transition: 0.3s ease all;
+  border-bottom: 1px solid #DDD;
+  font-size: 16px;
+}
+
+.bookmark:hover {
+  color: #898942;
+  text-decoration: none;
+}
+
+.bookmark:first-child {
+  border-top-left-radius: 5px;
+  border-top-right-radius: 5px;
+}
+
+.bookmark:last-child {
+  border-bottom-left-radius: 5px;
+  border-bottom-right-radius: 5px;
+  border-bottom: 0;
+}
+
+.bookmark .img {
+  background-color: #DDD;
+  border-radius: 3px;
+  background-image: url('img/calendar.jpg');
+  background-size: cover;
+  /* cover makes sure background image is the width of the div */
+  background-position: top center;
+  width: 125px;
+  height: 70px;
+  margin-right: 30px;
+}
+
+.bookmark .title {
+  display: flex;
+  /* flex so image and title are next to each other */
+  align-items: center;
+}
+
+.bookmark .glyphicon-remove {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  color: #EEE;
+  transition: 0.3s ease color;
+  cursor: pointer;
+}
+
+.bookmark:hover .glyphicon-remove {
+  color: #e10d0d;
+}
+    </style>
+  </head>
+  <body>
+    <div class="overlay"></div>
+
+    <div class="floater content">
+      <form class="bookmark-form">
+      <div class="floater-top">
+        <input type="text" class="form-control" placeholder="What is on your mind?">
+      </div>
+      <div class="floater-bottom">
+        <button type="submit" class="btn btn-primary btn-sm">Add</button>
+      </div>
+    </form>
+    </div>
+
+    <div class="bookmarks-list content"></div>
+    <!-- add the class content (which is also in floater) to save CSS style duplication -->
+
+    <script>
+    const body = document.body;
+    const input = document.querySelector('input[type=text]');
+    const overlay = document.querySelector('.overlay');
+    // this is for when we click on the overlay
+
+    function showFloater(){
+      body.classList.add('show-floater');
+    }
+
+    function closeFloater(){
+      if (body.classList.contains('show-floater')){
+      body.classList.remove('show-floater');
+    }
+    }
+
+    input.addEventListener('focusin', showFloater);
+    // input.addEventListener('focusout', closeFloater);
+    overlay.addEventListener('click', closeFloater);
+
+// ================Bookmarks================================
+
+    const bookmarksList = document.querySelector('.bookmarks-list');
+    const bookmarkForm = document.querySelector('.bookmark-form');
+    const bookMarkInput = bookmarkForm.querySelector('input[type=text]');
+    // to get the actual value out of the input in the form
+    const bookmarks = JSON.parse(localStorage.getItem('bookmarks')) || [];
+    // gets all the bookmarks from local storage but if there
+    // is none then use a blank array
+    const apiUrl  = 'https://opengraph.io/api/1.0/site';
+    const appId   = '5ae4d0bb9b03547407c6452e';
+
+
+    fillBookMarksList(bookmarks);
+    // once we start the page we want to display all the bookmarks
+
+    function createBookmark(event) {
+      event.preventDefault();
+      // event is passed by default to function, but calling the function
+      // prevents page from frefreshing when enter is pressed
+
+      if(!bookMarkInput.value) {
+        alert('Nothing to add');
+        return;
+      }
+      const url = encodeURIComponent(bookMarkInput.value);
+
+      fetch(apiUrl + '/' + url + '?app_id=' + appId)
+      .then(response => response.json())
+      // then stmt returns a promise from parsed data in the format we want
+      .then(data => {
+        // now we have the data from the above then stmt
+          //assign and handle variables or data recieved from the API
+
+          // add a new bookMark object to the bookmarkslist
+            const newBookMark = {
+              title: data.hybridGraph.title,
+              image: data.hybridGraph.image,
+              link: data.hybridGraph.url
+            };
+            bookmarks.push(newBookMark);
+            fillBookMarksList(bookmarks);
+            //each time a bookMark is created we recreate the entire list
+
+            // save that bookmarkslist to local Storage
+            storeBookmarks(bookmarks);
+            bookmarkForm.reset();
+           // now the input text clears each time after we add a bookmark
+
+         })
+         .catch(error => {
+           alert('not a valid url');
+         });
+
+    }
+
+//
+// Now we want to save to local storage so we don't need this
+//       const bookMarkTitle = bookMarkInput.value;
+//       const newBookMark = document.createElement('a');
+//       newBookMark.className = 'bookmark';
+//       newBookMark.innerText = bookMarkTitle;
+//       newBookMark.href = '#';
+//       newBookMark.target = '_blank';
+//
+//       bookmarkslist.appendChild(newBookMark);
+
+
+// create HTML for each bookmark in bookmarks and insert it into the body
+    function fillBookMarksList(bookmarks = []) {
+    const bookmarksHtml = bookmarks.map((newBookMark, i) => {
+        return `
+        <a href="${newBookMark.link}" class="bookmark" data-id="${i}">
+        <div class="img" style="background-image:url('${newBookMark.image}')"></div>
+        <div class="title">${newBookMark.title}</div>
+        <span class="glyphicon glyphicon-remove"></span>
+        </a>
+        `;
+      }).join('');
+      bookmarksList.innerHTML = bookmarksHtml;
+    }
+
+
+    function removeBookmark(event){
+      if (!event.target.classList.contains('glyphicon-remove'))
+   return;
+
+         //prevent default click behaviour
+         event.preventDefault();
+         event.returnValue = false;
+
+      // find index of clicked item
+      // looks inside parent of span i.e. the bookmark class for its data id
+      const index = event.target.parentNode.dataset.id;
+
+      // remove from bookmarks
+      bookmarks.splice(index, 1);
+      // fill the new list
+      fillBookMarksList(bookmarks);
+      // store new list back to local storage
+      storeBookmarks(bookmarks);
+
+    }
+
+    function storeBookmarks(bookmarks = []){
+      localStorage.setItem('bookmarks', JSON.stringify(bookmarks));
+      // local storage needs a string of JSON object
+      // stores an array of objects in string notation that has a single key 'bookmarks'
+    }
+
+
+    bookmarkForm.addEventListener('submit', createBookmark);
+    // by listening to the entire bookmark form you create a new bookmark by pressing enter
+    // or by clicking Add button, not just by clicking Add button
+    bookmarksList.addEventListener('click', removeBookmark);
+    //parent handles all the clicks because we dont have event listeners
+    // for every new bookmark since the addEventListener is only called one time
+    // when the page is loaded
+
+    </script>
+
+  </body>
+</html>
